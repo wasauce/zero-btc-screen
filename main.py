@@ -31,6 +31,18 @@ def fetch_prices():
     prices = [entry[1:] for entry in external_data['data']['entries']]
     return prices
 
+def fetch_prices_eth():
+    logger.info('Fetching prices')
+    timeslot_end = datetime.now(timezone.utc)
+    end_date = timeslot_end.strftime(DATETIME_FORMAT)
+    start_data = (timeslot_end - timedelta(days=DATA_SLICE_DAYS)).strftime(DATETIME_FORMAT)
+    url = f'https://production.api.coindesk.com/v2/price/values/ETH?ohlc=true&start_date={start_data}&end_date={end_date}'
+    req = Request(url)
+    data = urlopen(req).read()
+    external_data = json.loads(data)
+    prices = [entry[1:] for entry in external_data['data']['entries']]
+    return prices
+
 
 def main():
     logger.info('Initialize')
@@ -43,7 +55,14 @@ def main():
         while True:
             try:
                 prices = [entry[1:] for entry in get_dummy_data()] if config.dummy_data else fetch_prices()
-                data_sink.update_observers(prices)
+                data_sink.update_observers(prices, "BTC")
+                time.sleep(config.refresh_interval)
+            except (HTTPError, URLError) as e:
+                logger.error(str(e))
+                time.sleep(5)
+            try:
+                prices = [entry[1:] for entry in get_dummy_data()] if config.dummy_data else fetch_prices_eth()
+                data_sink.update_observers(prices, "ETH")
                 time.sleep(config.refresh_interval)
             except (HTTPError, URLError) as e:
                 logger.error(str(e))
